@@ -1,10 +1,15 @@
-const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');  // Add this line
-require('dotenv').config();
-const { getMovieEmbeddings, combineEmbeddings, extractTitles, cosineSimilarity } = require('./utils');
-const admin = require('firebase-admin');
-const Personality = require('./models/Personality');
+const express = require("express");
+const mongoose = require("mongoose");
+const cors = require("cors"); // Add this line
+require("dotenv").config();
+const {
+  getMovieEmbeddings,
+  combineEmbeddings,
+  extractTitles,
+  cosineSimilarity,
+} = require("./utils");
+const admin = require("firebase-admin");
+const Personality = require("./models/Personality");
 
 // Initialize Firebase Admin SDK
 try {
@@ -12,12 +17,12 @@ try {
     credential: admin.credential.cert({
       projectId: process.env.FIREBASE_PROJECT_ID,
       clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"),
     }),
   });
-  console.log('Firebase Admin SDK initialized successfully');
+  console.log("Firebase Admin SDK initialized successfully");
 } catch (error) {
-  console.error('Error initializing Firebase Admin SDK:', error);
+  console.error("Error initializing Firebase Admin SDK:", error);
   process.exit(1);
 }
 
@@ -25,49 +30,50 @@ const app = express();
 const PORT = process.env.PORT || 5001;
 
 // Middleware
-app.use(cors());  // Add this line to enable CORS for all routes
+app.use(cors()); // Add this line to enable CORS for all routes
 app.use(express.json());
 
 // Connect to MongoDB
-mongoose.connect(process.env.MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
-.then(() => console.log('MongoDB connected successfully'))
-.catch(err => console.log('MongoDB connection error:', err));
+mongoose
+  .connect(process.env.MONGODB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
+  .then(() => console.log("MongoDB connected successfully"))
+  .catch((err) => console.log("MongoDB connection error:", err));
 
 // Middleware to verify Firebase token
 const verifyToken = async (req, res, next) => {
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ message: 'Unauthorized: No token provided' });
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ message: "Unauthorized: No token provided" });
   }
 
-  const token = authHeader.split('Bearer ')[1];
+  const token = authHeader.split("Bearer ")[1];
   try {
     const decodedToken = await admin.auth().verifyIdToken(token);
     req.user = decodedToken;
     next();
   } catch (error) {
-    console.error('Error verifying token:', error);
-    res.status(401).json({ message: 'Unauthorized: Invalid token' });
+    console.error("Error verifying token:", error);
+    res.status(401).json({ message: "Unauthorized: Invalid token" });
   }
 };
 
 // Routes
-app.get('/', (req, res) => {
-  res.send('Hello from the backend!');
+app.get("/", (req, res) => {
+  res.send("Hello from the backend!");
 });
 
-// Modified POST route to receive data, get embeddings, and store both
-app.post('/api/data', verifyToken, async (req, res) => {
+app.post("/api/data", verifyToken, async (req, res) => {
   try {
     const incomingData = req.body;
     const titles = incomingData.titles;
     const serviceType = incomingData.serviceType; // Assuming this is sent from the frontend
+    const displayName = incomingData?.displayName;
 
     if (!serviceType) {
-      return res.status(400).json({ message: 'Service type is required' });
+      return res.status(400).json({ message: "Service type is required" });
     }
 
     // Get embeddings for the titles
@@ -79,7 +85,9 @@ app.post('/api/data', verifyToken, async (req, res) => {
 
     if (personalityData) {
       if (personalityData.bothServicesObtained) {
-        return res.status(200).json({ message: 'Personality data already complete' });
+        return res
+          .status(200)
+          .json({ message: "Personality data already complete" });
       }
 
       if (personalityData.serviceType === serviceType) {
@@ -88,7 +96,10 @@ app.post('/api/data', verifyToken, async (req, res) => {
       } else {
         // Combine embeddings for different service type
         const oldCombinedEmbedding = personalityData.embeddings;
-        const newCombinedEmbedding = combineEmbeddings([oldCombinedEmbedding, combinedEmbedding]);
+        const newCombinedEmbedding = combineEmbeddings([
+          oldCombinedEmbedding,
+          combinedEmbedding,
+        ]);
         personalityData.embeddings = newCombinedEmbedding;
         personalityData.bothServicesObtained = true;
       }
@@ -98,47 +109,59 @@ app.post('/api/data', verifyToken, async (req, res) => {
         token: req.user.uid,
         email: req.user.email,
         embeddings: combinedEmbedding,
-        serviceType: serviceType
+        serviceType: serviceType,
+        displayName: displayName || null,
       });
     }
 
-    await personalityData.save();
+    // await personalityData.save();
 
-    console.log('Personality data saved');
-    res.status(201).json({ message: 'Personality data saved successfully' });
+    console.log("Personality data saved");
+    res.status(201).json({ message: "Personality data saved successfully" });
   } catch (error) {
-    console.error('Error processing or saving data:', error);
+    console.error("Error processing or saving data:", error);
     res.status(400).json({ message: error.message });
   }
 });
 
-// New endpoint to get top K similar users
-app.get('/api/similar-users/:k', verifyToken, async (req, res) => {
+// New endpoint to get top K similar users for user with uid
+app.get("/api/similar-users/:uid/:k", async (req, res) => {
   try {
+    const uid = req.params.uid;
     const k = parseInt(req.params.k);
-    
+
     // Validate K
     if (isNaN(k) || k <= 0) {
-      return res.status(400).json({ message: 'Invalid K value. Must be a positive integer.' });
+      return res
+        .status(400)
+        .json({ message: "Invalid K value. Must be a positive integer." });
     }
 
     // Get the current user's personality data
-    const currentUser = await Personality.findOne({ token: req.user.uid });
-    if (!currentUser || !currentUser.embeddings || currentUser.embeddings.length === 0) {
-      return res.status(404).json({ message: 'User personality data not found or incomplete.' });
+    const currentUser = await Personality.findOne({ token: uid });
+    if (
+      !currentUser ||
+      !currentUser.embeddings ||
+      currentUser.embeddings.length === 0
+    ) {
+      return res
+        .status(404)
+        .json({ message: "User personality data not found or incomplete." });
     }
 
     // Get all other users' personality data
-    const allUsers = await Personality.find({ token: { $ne: req.user.uid } });
+    const allUsers = await Personality.find({ token: { $ne: uid } });
     if (allUsers.length === 0) {
-      return res.status(404).json({ message: 'No other users found for comparison.' });
+      return res
+        .status(404)
+        .json({ message: "No other users found for comparison." });
     }
 
     // Calculate similarities
-    const similarities = allUsers.map(user => ({
+    const similarities = allUsers.map((user) => ({
       userId: user.token,
       email: user.email,
-      similarity: cosineSimilarity(currentUser.embeddings, user.embeddings)
+      similarity: cosineSimilarity(currentUser.embeddings, user.embeddings),
     }));
 
     // Sort by similarity (descending)
@@ -148,17 +171,18 @@ app.get('/api/similar-users/:k', verifyToken, async (req, res) => {
     const topKSimilar = similarities.slice(0, Math.min(k, similarities.length));
 
     // Add a message if K was larger than the number of available users
-    const responseMessage = k > similarities.length 
-      ? `Requested ${k} similar users, but only ${similarities.length} are available.`
-      : `Top ${k} similar users found.`;
+    const responseMessage =
+      k > similarities.length
+        ? `Requested ${k} similar users, but only ${similarities.length} are available.`
+        : `Top ${k} similar users found.`;
 
     res.status(200).json({
       message: responseMessage,
-      users: topKSimilar
+      users: topKSimilar,
     });
   } catch (error) {
-    console.error('Error finding similar users:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    console.error("Error finding similar users:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 });
 
