@@ -160,6 +160,7 @@ app.get("/api/similar-users/:uid/:k", async (req, res) => {
     const similarities = allUsers.map((user) => ({
       userId: user.token,
       email: user.email,
+      displayName: user?.displayName ?? null,
       similarity: cosineSimilarity(currentUser.embeddings, user.embeddings),
     }));
 
