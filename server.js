@@ -82,7 +82,6 @@ app.post("/api/data", verifyToken, async (req, res) => {
 
     // Find or create personality data
     let personalityData = await Personality.findOne({ token: req.user.uid });
-
     if (personalityData) {
       if (personalityData.bothServicesObtained) {
         return res
@@ -114,7 +113,7 @@ app.post("/api/data", verifyToken, async (req, res) => {
       });
     }
 
-    // await personalityData.save();
+    await personalityData.save();
 
     console.log("Personality data saved");
     res.status(201).json({ message: "Personality data saved successfully" });
