@@ -190,3 +190,5 @@ app.get("/api/similar-users/:uid/:k", async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
+
+
