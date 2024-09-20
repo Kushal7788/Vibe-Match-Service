@@ -186,6 +186,54 @@ app.get("/api/similar-users/:uid/:k", async (req, res) => {
   }
 });
 
+// endpoint to get similarilty between two users
+app.get("/api/similarity/:uid1/:uid2", async (req, res) => {
+  try {
+    const uid1 = req.params.uid1;
+    const uid2 = req.params.uid2;
+    const user1 = await Personality.findOne({ token: uid1 });
+    const user2 = await Personality.findOne({ token: uid2 });
+    if (!user1) {
+      return res.status(404).json({
+        message: `${
+          user1?.displayName ?? "Your friend's"
+        } personality data not found or incomplete.`,
+      });
+    }
+
+    if (!user2) {
+      return res.status(404).json({
+        message: `${
+          user2?.displayName ?? "Your"
+        } personality data not found or incomplete.`,
+      });
+    }
+
+    if (!user1.embeddings) {
+      return res.status(404).json({
+        message: `${
+          user1?.displayName ?? "Your friend's"
+        } personality data not found or incomplete.`,
+      });
+    }
+
+    if (!user2.embeddings) {
+      return res.status(404).json({
+        message: `${
+          user2?.displayName ?? "Your"
+        } personality data not found or incomplete.`,
+      });
+    }
+
+    const similarity = cosineSimilarity(user1.embeddings, user2.embeddings);
+    console.log("Similarity between users:", similarity);
+    res.status(200).json({ similarity });
+  } catch (error) {
+    console.error("Error finding similarity between users:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
 // Start the server
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
