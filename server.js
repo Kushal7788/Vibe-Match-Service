@@ -187,7 +187,7 @@ app.get("/api/similar-users/:uid/:k", async (req, res) => {
 });
 
 // endpoint to get similarilty between two users
-app.get("/api/similarity/:uid1/:uid2", async (req, res) => {
+app.get("/api/similarity/:uid1/:uid2", verifyToken, async (req, res) => {
   try {
     const uid1 = req.params.uid1;
     const uid2 = req.params.uid2;
