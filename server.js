@@ -65,6 +65,17 @@ app.get("/", (req, res) => {
   res.send("Hello from the backend!");
 });
 
+// get user data
+app.get("/api/user", verifyToken, async (req, res) => {
+  try {
+    const user = await Personality.findOne({ token: req.user.uid });
+    res.status(200).json({ user });
+  } catch (error) {
+    console.error("Error fetching user data:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
 app.post("/api/data", verifyToken, async (req, res) => {
   try {
     const incomingData = req.body;
@@ -94,6 +105,7 @@ app.post("/api/data", verifyToken, async (req, res) => {
         personalityData.embeddings = combinedEmbedding;
       } else {
         // Combine embeddings for different service type
+
         const oldCombinedEmbedding = personalityData.embeddings;
         const newCombinedEmbedding = combineEmbeddings([
           oldCombinedEmbedding,
@@ -101,21 +113,29 @@ app.post("/api/data", verifyToken, async (req, res) => {
         ]);
         personalityData.embeddings = newCombinedEmbedding;
         personalityData.bothServicesObtained = true;
+        personalityData.verificationSubmitted[serviceType] = true;
       }
     } else {
       // Create new personality data
+      const otherServiceType = serviceType === "prime" ? "netflix" : "prime";
+      const verificationSubmitted = {
+        [serviceType]: true,
+        [otherServiceType]: false,
+      };
+
+      console.log("verificationSubmitted before save:", verificationSubmitted);
+
       personalityData = new Personality({
         token: req.user.uid,
         email: req.user.email,
         embeddings: combinedEmbedding,
         serviceType: serviceType,
         displayName: displayName || "",
+        verificationSubmitted: verificationSubmitted,
       });
     }
-
+    console.log("personalityData before save:", personalityData.toObject());
     await personalityData.save();
-
-    console.log("Personality data saved");
     res.status(201).json({ message: "Personality data saved successfully" });
   } catch (error) {
     console.error("Error processing or saving data:", error);

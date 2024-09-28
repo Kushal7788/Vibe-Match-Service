@@ -8,6 +8,13 @@ const PersonalitySchema = new mongoose.Schema(
     serviceType: String,
     bothServicesObtained: { type: Boolean, default: false },
     displayName: { type: String, default: "" },
+    verificationSubmitted: {
+      type: Object,
+      default: {
+        prime: false,
+        netflix: false,
+      },
+    },
   },
   { timestamps: true }
 );
