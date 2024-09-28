@@ -1,19 +1,20 @@
-const { OpenAI } = require('openai');
+const { OpenAI } = require("openai");
 
 // Set your OpenAI API key
 const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 async function getMovieEmbeddings(titles) {
+  console.log({ titles });
   try {
     const response = await openai.embeddings.create({
-        input: titles,
-        model: "text-embedding-3-small"
+      input: titles,
+      model: "text-embedding-3-small",
     });
 
     // Return an array of embeddings, one for each title
-    return response.data.map(item => item.embedding);
+    return response.data.map((item) => item.embedding);
   } catch (error) {
     console.error("Error getting embeddings:", error);
     throw error;
@@ -21,8 +22,11 @@ async function getMovieEmbeddings(titles) {
 }
 
 function combineEmbeddings(embeddings) {
-  const sum = embeddings.reduce((acc, curr) => acc.map((val, idx) => val + curr[idx]), new Array(embeddings[0].length).fill(0));
-  return sum.map(val => val / embeddings.length);
+  const sum = embeddings.reduce(
+    (acc, curr) => acc.map((val, idx) => val + curr[idx]),
+    new Array(embeddings[0].length).fill(0)
+  );
+  return sum.map((val) => val / embeddings.length);
 }
 
 function cosineSimilarity(vecA, vecB) {
@@ -38,7 +42,7 @@ function findTopKSimilarUsers(users, k) {
     for (let j = i + 1; j < users.length; j++) {
       similarities.push({
         pair: [i, j],
-        similarity: cosineSimilarity(users[i], users[j])
+        similarity: cosineSimilarity(users[i], users[j]),
       });
     }
   }
@@ -48,7 +52,7 @@ function findTopKSimilarUsers(users, k) {
 function extractTitles(jsonData) {
   // Check if jsonData is an array and has at least one element
   if (!Array.isArray(jsonData) || jsonData.length === 0) {
-    throw new Error('Invalid input: Expected a non-empty array');
+    throw new Error("Invalid input: Expected a non-empty array");
   }
 
   // Access the first (and presumably only) object in the array
@@ -56,31 +60,31 @@ function extractTitles(jsonData) {
 
   // Check if the object has a publicData property with a titles array
   if (!dataObject.publicData || !Array.isArray(dataObject.publicData.titles)) {
-    throw new Error('Invalid data structure: Expected publicData.titles array');
+    throw new Error("Invalid data structure: Expected publicData.titles array");
   }
 
   // Return the titles array
   return dataObject.publicData.titles;
 }
 
-module.exports = { 
-  getMovieEmbeddings, 
-  combineEmbeddings, 
+module.exports = {
+  getMovieEmbeddings,
+  combineEmbeddings,
   findTopKSimilarUsers,
   extractTitles,
-  cosineSimilarity  // Add this export
+  cosineSimilarity, // Add this export
 };
 
 // Example usage:
 // const { getMovieEmbeddings, combineEmbeddings, findTopKSimilarUsers } = require('./utils');
-// 
+//
 // async function main() {
 //   const usersTitles = [
 //     ["The Shawshank Redemption", "The Godfather", "The Dark Knight"],
 //     ["Pulp Fiction", "Inception", "The Matrix"],
 //     ["Forrest Gump", "The Green Mile", "Schindler's List"]
 //   ];
-//   
+//
 //   try {
 //     const usersEmbeddings = await Promise.all(usersTitles.map(getMovieEmbeddings));
 //     const combinedEmbeddings = usersEmbeddings.map(combineEmbeddings);
@@ -90,5 +94,5 @@ module.exports = {
 //     console.error("An error occurred:", error);
 //   }
 // }
-// 
+//
 // main();
